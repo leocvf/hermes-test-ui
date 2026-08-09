@@ -1,4 +1,7 @@
-test-ui-app
+# Build output (only inside the Angular app)
+test-ui-app/dist/
+test-ui-app/.angular/
+test-ui-app/node_modules/
+
+# TypeScript build info
 *.tsbuildinfo
-.angular/
-node_modules/
