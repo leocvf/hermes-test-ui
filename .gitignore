@@ -1,0 +1,4 @@
+test-ui-app
+*.tsbuildinfo
+.angular/
+node_modules/
