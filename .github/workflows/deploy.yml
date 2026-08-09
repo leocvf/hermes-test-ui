@@ -6,17 +6,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,19 +29,17 @@ jobs:
         working-directory: ./test-ui-app
         run: npm run build -- --base-href=/hermes-test-ui/
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: test-ui-app/dist/test-ui-app/browser
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Deploy to gh-pages
+        run: |
+          cd test-ui-app/dist/test-ui-app/browser
+          git init
+          git checkout -b gh-pages
+          git add .
+          git commit -m "Deploy $(git --git-dir=../../../.git rev-parse --short HEAD)"
+          git remote add origin https://github.com/${{ github.repository }}.git
+          git push --force origin gh-pages
