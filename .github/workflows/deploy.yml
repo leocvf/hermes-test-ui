@@ -36,10 +36,12 @@ jobs:
 
       - name: Deploy to gh-pages
         working-directory: test-ui-app/dist/test-ui-app/browser
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git init
           git checkout -B gh-pages
           git add .
           git commit -m "Deploy $GITHUB_SHA"
-          git remote add origin https://github.com/${{ github.repository }}.git
+          git remote add origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
           git push --force origin gh-pages
