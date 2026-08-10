@@ -29,17 +29,17 @@ jobs:
         working-directory: ./test-ui-app
         run: npm run build -- --base-href=/hermes-test-ui/
 
-      - name: Configure Git
+      - name: Configure Git globally
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Deploy to gh-pages
+        working-directory: test-ui-app/dist/test-ui-app/browser
         run: |
-          cd test-ui-app/dist/test-ui-app/browser
           git init
-          git checkout -b gh-pages
+          git checkout -B gh-pages
           git add .
-          git commit -m "Deploy $(git --git-dir=../../../.git rev-parse --short HEAD)"
+          git commit -m "Deploy $GITHUB_SHA"
           git remote add origin https://github.com/${{ github.repository }}.git
           git push --force origin gh-pages
