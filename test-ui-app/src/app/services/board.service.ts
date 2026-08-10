@@ -1,34 +1,18 @@
 import { Injectable, signal, computed } from '@angular/core';
 
-function uuidv4(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
+export interface Label { id: string; name: string; color: string }
 
-export interface Label {
-  id: string;
-  name: string;
-  color: string;
-}
-
-export interface ChecklistItem {
-  id: string;
-  text: string;
-  done: boolean;
-}
+export interface ChecklistItem { id: string; text: string; done: boolean }
 
 export interface Card {
   id: string;
   title: string;
   description: string;
-  labels: Label[];
   priority: 'low' | 'medium' | 'high' | 'urgent';
+  labels: Label[];
+  checklist: ChecklistItem[];
   dueDate: string | null;
   assignee: string;
-  checklist: ChecklistItem[];
-  order: number;
 }
 
 export interface Column {
@@ -38,13 +22,7 @@ export interface Column {
   order: number;
 }
 
-export interface BoardState {
-  columns: Column[];
-}
-
-const LOCAL_STORAGE_KEY = 'kanban-board-state';
-
-const DEFAULT_LABELS: Label[] = [
+const defaultLabels: Label[] = [
   { id: 'l1', name: 'Feature', color: '#3b82f6' },
   { id: 'l2', name: 'Bug', color: '#ef4444' },
   { id: 'l3', name: 'Improvement', color: '#10b981' },
@@ -52,207 +30,109 @@ const DEFAULT_LABELS: Label[] = [
   { id: 'l5', name: 'Urgent', color: '#f59e0b' },
 ];
 
-function createCard(overrides: Partial<Card> = {}): Card {
-  return {
-    id: uuidv4(),
-    title: '',
-    description: '',
-    labels: [],
-    priority: 'medium',
-    dueDate: null,
-    assignee: '',
-    checklist: [],
-    order: 0,
-    ...overrides,
-  };
-}
+const defaultCards: Card[] = [
+  { id: 'c1', title: 'Research dependencies', description: 'Research and compare available dependency injection frameworks for Angular.', priority: 'high', labels: [defaultLabels[0]], checklist: [{ id: 'ci1', text: 'List options', done: true }, { id: 'ci2', text: 'Compare pros/cons', done: true }], dueDate: '2025-07-15', assignee: 'Alice' },
+  { id: 'c2', title: 'Set up CI pipeline', description: 'Configure GitHub Actions for automated testing and deployment.', priority: 'medium', labels: [defaultLabels[0]], checklist: [{ id: 'ci3', text: 'Create workflow file', done: true }], dueDate: '2025-07-20', assignee: 'Bob' },
+  { id: 'c3', title: 'Write unit tests', description: 'Add unit tests for core services and components.', priority: 'medium', labels: [defaultLabels[1]], checklist: [], dueDate: '2025-07-25', assignee: 'Charlie' },
+  { id: 'c4', title: 'Update README', description: 'Document setup instructions and contribution guidelines.', priority: 'low', labels: [defaultLabels[3]], checklist: [], dueDate: null, assignee: '' },
+  { id: 'c5', title: 'Fix navigation bug', description: 'Mobile menu doesn\'t close after selecting an item.', priority: 'urgent', labels: [defaultLabels[1], defaultLabels[4]], checklist: [{ id: 'ci4', text: 'Reproduce issue', done: true }, { id: 'ci5', text: 'Fix close logic', done: false }], dueDate: '2025-07-10', assignee: 'Alice' },
+  { id: 'c6', title: 'Performance audit', description: 'Run Lighthouse and optimize bundle size.', priority: 'high', labels: [defaultLabels[2]], checklist: [{ id: 'ci6', text: 'Run Lighthouse', done: true }, { id: 'ci7', text: 'Tree shake unused modules', done: false }, { id: 'ci8', text: 'Lazy load routes', done: false }], dueDate: '2025-07-18', assignee: 'Bob' },
+  { id: 'c7', title: 'Deploy to staging', description: 'Set up staging environment and deploy latest build.', priority: 'medium', labels: [defaultLabels[0]], checklist: [{ id: 'ci9', text: 'Configure staging env', done: true }], dueDate: '2025-07-22', assignee: 'Charlie' },
+];
 
-function createColumn(overrides: Partial<Column> = {}): Column {
-  return { id: uuidv4(), title: '', cards: [], order: 0, ...overrides };
-}
+const defaultColumns: Column[] = [
+  { id: 'col1', title: 'To Do', cards: [defaultCards[0], defaultCards[1], defaultCards[3]], order: 0 },
+  { id: 'col2', title: 'In Progress', cards: [defaultCards[2], defaultCards[5]], order: 1 },
+  { id: 'col3', title: 'Review', cards: [defaultCards[4]], order: 2 },
+  { id: 'col4', title: 'Done', cards: [defaultCards[6]], order: 3 },
+];
 
-function getDefaultBoard(): BoardState {
-  return {
-    columns: [
-      createColumn({
-        title: 'To Do',
-        order: 0,
-        cards: [
-          createCard({ title: 'Set up project structure', description: 'Initialize Angular app with routing and basic layout', labels: [{ ...DEFAULT_LABELS[0] }], priority: 'high', order: 0 }),
-          createCard({ title: 'Design wireframes', description: 'Create wireframes for the kanban board UI', labels: [{ ...DEFAULT_LABELS[3] }], priority: 'medium', order: 1 }),
-          createCard({ title: 'Fix login bug on Safari', description: 'Users report login form not submitting on Safari browser', labels: [{ ...DEFAULT_LABELS[1] }, { ...DEFAULT_LABELS[4] }], priority: 'urgent', order: 2 }),
-        ],
-      }),
-      createColumn({
-        title: 'In Progress',
-        order: 1,
-        cards: [
-          createCard({ title: 'Implement drag and drop', description: 'Use native HTML5 drag and drop API for cards', labels: [{ ...DEFAULT_LABELS[0] }], priority: 'high', dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], order: 0 }),
-          createCard({ title: 'Add filtering feature', description: 'Allow filtering cards by label, assignee, and date', labels: [{ ...DEFAULT_LABELS[2] }], priority: 'medium', order: 1 }),
-        ],
-      }),
-      createColumn({
-        title: 'Review',
-        order: 2,
-        cards: [
-          createCard({ title: 'Code review: auth module', description: 'Review pull request for authentication module', labels: [{ ...DEFAULT_LABELS[3] }], priority: 'low', order: 0 }),
-        ],
-      }),
-      createColumn({
-        title: 'Done',
-        order: 3,
-        cards: [
-          createCard({ title: 'Setup CI/CD pipeline', description: 'Configure GitHub Actions for automated testing and deployment', labels: [{ ...DEFAULT_LABELS[2] }], priority: 'high', dueDate: new Date(Date.now() - 86400000).toISOString().split('T')[0], order: 0 }),
-        ],
-      }),
-    ],
-  };
-}
-
-function loadBoard(): BoardState | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return null;
-}
-
-function saveBoard(state: BoardState): void {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
-  } catch { /* quota exceeded, ignore */ }
-}
+let nextId = 100;
+const genId = (): string => `card-${nextId++}`;
 
 @Injectable({ providedIn: 'root' })
 export class BoardService {
-  private state = signal<BoardState>(loadBoard() ?? getDefaultBoard());
+  private columnsSignal = signal<Column[]>(this.loadFromStorage() ?? this.clone(defaultColumns));
 
-  columns = computed(() => {
-    const cols = [...this.state().columns];
-    cols.sort((a, b) => a.order - b.order);
-    return cols;
-  });
+  columns = computed(() => this.columnsSignal().sort((a, b) => a.order - b.order));
 
-  allCards = computed(() => {
-    return this.columns().flatMap(c => c.cards.map(card => ({ ...card, columnId: c.id })));
-  });
-
-  boardState = this.state;
-
-  nextOrder(arr: unknown[]): number {
-    return arr.length;
-  }
-
-  addCard(columnId: string, card?: Partial<Card>): void {
-    const s = this.state();
-    const col = s.columns.find(c => c.id === columnId);
-    if (!col) return;
-    const newCard = createCard(card ?? {});
-    newCard.order = this.nextOrder(col.cards);
-    col.cards.push(newCard);
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
-  }
-
-  updateCard(columnId: string, cardId: string, updates: Partial<Card>): void {
-    const s = this.state();
-    const col = s.columns.find(c => c.id === columnId);
-    if (!col) return;
-    const card = col.cards.find(c => c.id === cardId);
-    if (!card) return;
-    Object.assign(card, updates);
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
-  }
-
-  deleteCard(columnId: string, cardId: string): void {
-    const s = this.state();
-    const col = s.columns.find(c => c.id === columnId);
-    if (!col) return;
-    col.cards = col.cards.filter(c => c.id !== cardId);
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
+  private save(): void { this.columnsSignal.update(c => c); localStorage.setItem('kanban-board', JSON.stringify(this.columnsSignal())); }
+  private loadFromStorage(): Column[] | null {
+    try { const raw = localStorage.getItem('kanban-board'); return raw ? JSON.parse(raw) : null; } catch { return null; }
   }
 
   addColumn(title: string): void {
-    const s = this.state();
-    const newCol = createColumn({ title, order: this.nextOrder(s.columns) });
-    s.columns.push(newCol);
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
+    const col: Column = { id: `col-${Date.now()}`, title, cards: [], order: this.columns().length };
+    this.columnsSignal.update(cols => [...cols, col]);
+    this.save();
   }
 
-  updateColumnTitle(columnId: string, title: string): void {
-    const s = this.state();
-    const col = s.columns.find(c => c.id === columnId);
-    if (!col) return;
-    col.title = title;
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
+  removeColumn(colId: string): void {
+    this.columnsSignal.update(cols => cols.filter(c => c.id !== colId).map((c, i) => ({ ...c, order: i })));
+    this.save();
   }
 
-  deleteColumn(columnId: string): void {
-    const s = this.state();
-    s.columns = s.columns.filter(c => c.id !== columnId);
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
-  }
-
-  moveCard(fromColumnId: string, toColumnId: string, cardId: string, toOrder?: number): void {
-    const s = this.state();
-    const fromCol = s.columns.find(c => c.id === fromColumnId);
-    const toCol = s.columns.find(c => c.id === toColumnId);
-    if (!fromCol || !toCol) return;
-    const cardIdx = fromCol.cards.findIndex(c => c.id === cardId);
-    if (cardIdx === -1) return;
-    const [card] = fromCol.cards.splice(cardIdx, 1);
-    card.order = toOrder !== undefined ? toOrder : this.nextOrder(toCol.cards);
-    toCol.cards.splice(card.order, 0, card);
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
-  }
-
-  reorderColumns(newOrder: string[]): void {
-    const s = this.state();
-    const orderMap = new Map(newOrder.map((id, i) => [id, i]));
-    s.columns.forEach(c => { c.order = orderMap.get(c.id) ?? 0; });
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
-  }
-
-  moveColumnUp(columnId: string): void {
-    const s = this.state();
-    const idx = s.columns.findIndex(c => c.id === columnId);
+  moveColumnUp(colId: string): void {
+    const cols = this.columns();
+    const idx = cols.findIndex(c => c.id === colId);
     if (idx <= 0) return;
-    const a = s.columns[idx - 1];
-    const b = s.columns[idx];
-    const tmp = a.order;
-    a.order = b.order;
-    b.order = tmp;
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
+    const updated = [...cols];
+    [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
+    this.columnsSignal.set(updated.map((c, i) => ({ ...c, order: i })));
+    this.save();
   }
 
-  moveColumnDown(columnId: string): void {
-    const s = this.state();
-    const idx = s.columns.findIndex(c => c.id === columnId);
-    if (idx < 0 || idx >= s.columns.length - 1) return;
-    const a = s.columns[idx];
-    const b = s.columns[idx + 1];
-    const tmp = a.order;
-    a.order = b.order;
-    b.order = tmp;
-    this.state.update(() => ({ ...s, columns: [...s.columns] }));
-    this.persist();
+  moveColumnDown(colId: string): void {
+    const cols = this.columns();
+    const idx = cols.findIndex(c => c.id === colId);
+    if (idx < 0 || idx >= cols.length - 1) return;
+    const updated = [...cols];
+    [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+    this.columnsSignal.set(updated.map((c, i) => ({ ...c, order: i })));
+    this.save();
   }
 
-  resetBoard(): void {
-    const def = getDefaultBoard();
-    this.state.update(() => def);
-    this.persist();
+  addCard(colId: string): void {
+    const newCard: Card = { id: genId(), title: 'New Card', description: '', priority: 'medium', labels: [], checklist: [], dueDate: null, assignee: '' };
+    this.columnsSignal.update(cols => cols.map(c => c.id === colId ? { ...c, cards: [newCard, ...c.cards] } : c));
+    this.save();
   }
 
-  private persist(): void {
-    saveBoard(this.state());
+  deleteCard(colId: string, cardId: string): void {
+    this.columnsSignal.update(cols => cols.map(c => c.id === colId ? { ...c, cards: c.cards.filter(card => card.id !== cardId) } : c));
+    this.save();
   }
+
+  updateCard(colId: string, cardId: string, updates: Partial<Card>): void {
+    this.columnsSignal.update(cols => cols.map(c => c.id === colId ? { ...c, cards: c.cards.map(card => card.id === cardId ? { ...card, ...updates } : card) } : c));
+    this.save();
+  }
+
+  moveCard(fromColId: string, toColId: string, cardId: string): void {
+    if (fromColId === toColId) return;
+    let card: Card | undefined;
+    const withoutCard = this.columnsSignal().map(c => {
+      if (c.id === fromColId) {
+        const found = c.cards.find(card => card.id === cardId);
+        if (found) card = found;
+        return { ...c, cards: c.cards.filter(card => card.id !== cardId) };
+      }
+      return c;
+    });
+
+    if (!card) return;
+
+    const targetCol = withoutCard.find(c => c.id === toColId);
+    if (!targetCol) return;
+
+    this.columnsSignal.set(withoutCard.map(c => {
+      if (c.id === toColId) return { ...c, cards: [...c.cards, card!] };
+      return c;
+    }));
+    this.save();
+  }
+
+  resetBoard(): void { localStorage.removeItem('kanban-board'); this.columnsSignal.set(this.clone(defaultColumns)); }
+
+  private clone<T>(obj: T): T { return JSON.parse(JSON.stringify(obj)); }
 }

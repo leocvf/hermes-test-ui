@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input } from '@angular/core';
 import { Card } from '../../services/board.service';
 
 @Component({
@@ -6,7 +6,7 @@ import { Card } from '../../services/board.service';
   standalone: true,
   imports: [],
   template: `
-    <div class="card" draggable="true" (dragstart)="onDragStart($event)" (click)="onEdit()">
+    <div class="card" card-draggable="true" draggable="true" (dragstart)="onDragStart($event)">
       <div class="card-labels">
         @for (label of card().labels; track label.id) {
           <span class="label-badge" [style.background]="label.color">{{ label.name }}</span>
@@ -116,8 +116,6 @@ export class CardComponent {
   card = input.required<Card>();
   columnId = input.required<string>();
 
-  edit = output<Card>();
-
   isOverdue(): boolean {
     const dueDate = this.card().dueDate;
     if (!dueDate) return false;
@@ -139,9 +137,5 @@ export class CardComponent {
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
     }
-  }
-
-  onEdit(): void {
-    this.edit.emit(this.card());
   }
 }
